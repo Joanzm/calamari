@@ -6,6 +6,7 @@ import os
 import numpy as np
 
 from calamari_ocr.utils import parallel_map, split_all_ext
+from calamari_ocr.utils.Abbyy.Reader import XMLReader
 
 
 class DataSet(ABC):
@@ -349,3 +350,77 @@ class FileDataSet(DataSet):
             return None
 
         return img
+
+
+class AbbyyDataSet(DataSet):
+
+    def __init__(self, path, skip_invalid=False, remove_invalid=True):
+
+        """ Create a dataset from a Path as String
+
+        Parameters
+         ----------
+        path : str, required
+            The Abbyy Documents and images folders absolute path
+        skip_invalid : bool, optional
+            skip invalid files
+        remove_invalid : bool, optional
+            remove invalid files
+        """
+
+        super().__init__(True, True, skip_invalid, remove_invalid)
+
+        self.book = XMLReader(path).read()
+
+        count = 0
+        for page in self.book.pages:
+            for line in page.getLines():
+                for fo in line.formats:
+                    self.add_sample({
+                        "image_path": path + "\\" + page.imgFile,
+                        "id": count,
+                        "line": line,
+                        "format": fo
+                    })
+                    count = count + 1
+
+
+
+    def _load_sample(self, sample):
+        image_path = sample["image_path"]
+        line = sample["line"]
+        text = sample["format"].text
+
+        if image_path is None:
+            return None
+
+        if not os.path.exists(image_path):
+            if self._non_existing_as_empty:
+                return np.zeros((1, 1))
+            else:
+                raise Exception("Image file at '{}' does not exist".format(image_path))
+
+        try:
+            img = skimage_io.imread(image_path)
+        except:
+            return None
+
+        ly, lx = img.shape
+
+        # Cut the Image
+        cut = img[line.rect.top: -ly + line.rect.bottom, line.rect.left: -lx + line.rect.right]
+
+        # Make white Image with 3 Pixel at bottom and top more than cut
+        img = np.zeros([line.rect.height + 6, line.rect.width, 3], dtype=np.uint8)
+        img.fill(255)
+
+        # Insert cut into the white Image
+        h = len(cut)
+        w = len(cut[0])
+
+        for y in range(h):
+            for x in range(w):
+                img[y + 3, x] = cut[y, x]
+
+        return img, text
+
