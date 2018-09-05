@@ -10,7 +10,7 @@ class XMLWriter:
 
     """
 
-    def __init__(self, imgpath: str, book: Book):
+    def __init__(self, savepath: str, imgpath: str, book: Book):
 
         """
         Initialize an XMLWriter class to write an AbbyyDocument
@@ -19,9 +19,10 @@ class XMLWriter:
         :param book: the abbyy book class which should be written
         """
 
-        self.directory = imgpath + "\\save"
+        self.directory = savepath + "\\save"
         self.book = book
         self.imgpath = imgpath
+        self.savepath = savepath
 
     def write(self):
 
@@ -109,7 +110,6 @@ class XMLWriter:
                             foNode = ET.SubElement(lineNode, "formatting")
                             self._addElement(foNode, "lang", fo.lang)
                             foNode.text = fo.text
-                            print(fo.text)
 
             oldxmlfile = page.xmlFile
             oldimgfile = page.imgFile

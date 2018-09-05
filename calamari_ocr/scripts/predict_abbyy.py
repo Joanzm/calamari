@@ -1,17 +1,16 @@
 import argparse
-import codecs
-import sys
 import os
 
 from bidi.algorithm import get_base_level
 
 from google.protobuf.json_format import MessageToJson
 
-
+from calamari_ocr.utils.glob import glob_all
 from calamari_ocr.ocr.dataset import AbbyyDataSet
-from calamari_ocr.ocr import Predictor, MultiPredictor
+from calamari_ocr.ocr import MultiPredictor
 from calamari_ocr.ocr.voting import voter_from_proto
 from calamari_ocr.proto import VoterParams, Predictions
+from calamari_ocr.utils.Abbyy.Writer import XMLWriter
 
 
 def run(args):
@@ -19,10 +18,10 @@ def run(args):
     if args.extended_prediction_data_format not in ["pred", "json"]:
         raise Exception("Only 'pred' and 'json' are allowed extended prediction data formats")
 
-    """"# add json as extension, resolve wildcard, expand user, ... and remove .json again
+    # add json as extension, resolve wildcard, expand user, ... and remove .json again
     args.checkpoint = [(cp if cp.endswith(".json") else cp + ".json") for cp in args.checkpoint]
     args.checkpoint = glob_all(args.checkpoint)
-    args.checkpoint = [cp[:-5] for cp in args.checkpoint]"""
+    args.checkpoint = [cp[:-5] for cp in args.checkpoint]
 
     # create voter
     voter_params = VoterParams()
@@ -30,11 +29,9 @@ def run(args):
     voter = voter_from_proto(voter_params)
 
     # load files
-    print(args.path)
-    print(os.listdir(args.path))
 
     # skip invalid files, but keep then so that empty predictions are created
-    dataset = AbbyyDataSet(args.path,
+    dataset = AbbyyDataSet(args.files,
                           skip_invalid=True,
                           remove_invalid=False)
 
@@ -45,13 +42,16 @@ def run(args):
         raise Exception("Empty dataset provided. Check your files argument (got {})!".format(args.files))
 
     # predict for all models
-    predictor = MultiPredictor(checkpoints=[], batch_size=args.batch_size, processes=args.processes)
+    predictor = MultiPredictor(checkpoints=args.checkpoint, batch_size=args.batch_size, processes=args.processes)
     do_prediction = predictor.predict_dataset(dataset, progress_bar=not args.no_progress_bars)
 
     # output the voted results to the appropriate files
     input_image_files = []
-    for fo in dataset.book.getFormats():
-        input_image_files.append(fo)
+
+    for page in dataset.book.pages:
+        for fo in page.getFormats():
+            input_image_files.append(args.files + "\\" + page.imgFile)
+
     for (result, sample), filepath in zip(do_prediction, input_image_files):
         for i, p in enumerate(result):
             p.prediction.id = "fold_{}".format(i)
@@ -66,8 +66,7 @@ def run(args):
 
         output_dir = args.output_dir if args.output_dir else os.path.dirname(filepath)
 
-        with codecs.open(os.path.join(output_dir, sample['id'] + ".pred.txt"), 'w', 'utf-8') as f:
-            f.write(sentence)
+        sample["format"].text = sentence
 
         if args.extended_prediction_data:
             ps = Predictions()
@@ -88,14 +87,19 @@ def run(args):
             else:
                 raise Exception("Unknown prediction format.")
 
+    w = XMLWriter(output_dir, os.path.dirname(filepath), dataset.book)
+    w.write()
+
     print("All files written")
 
 
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-p", "--path", type=str, required=True, default="",
+    parser.add_argument("--files", type=str, required=True, default="",
                         help="Path to the Abbyy Documents and their images")
+    parser.add_argument("--checkpoint", type=str, nargs="+", default=[],
+                        help="Path to the checkpoint without file extension")
     parser.add_argument("-j", "--processes", type=int, default=1,
                         help="Number of processes to use")
     parser.add_argument("--batch_size", type=int, default=1,

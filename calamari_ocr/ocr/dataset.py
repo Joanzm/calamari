@@ -378,7 +378,7 @@ class AbbyyDataSet(DataSet):
                 for fo in line.formats:
                     self.add_sample({
                         "image_path": path + "\\" + page.imgFile,
-                        "id": count,
+                        "id": count.__str__(),
                         "line": line,
                         "format": fo
                     })
