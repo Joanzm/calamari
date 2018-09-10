@@ -1,5 +1,6 @@
 import argparse
 import os
+import glob
 
 from bidi.algorithm import get_base_level
 
@@ -29,11 +30,11 @@ def run(args):
     voter = voter_from_proto(voter_params)
 
     # load files
-
-    # skip invalid files, but keep then so that empty predictions are created
-    dataset = AbbyyDataSet(args.files,
-                          skip_invalid=True,
-                          remove_invalid=False)
+    files = glob.glob(args.files)
+    dataset = AbbyyDataSet(files,
+                           skip_invalid=True,
+                           remove_invalid=False,
+                           binary=args.binary)
 
     dataset.load_samples(processes=args.processes, progress_bar=not args.no_progress_bars)
 
@@ -48,9 +49,10 @@ def run(args):
     # output the voted results to the appropriate files
     input_image_files = []
 
+    # creat input_image_files list for next loop
     for page in dataset.book.pages:
         for fo in page.getFormats():
-            input_image_files.append(args.files + "\\" + page.imgFile)
+            input_image_files.append(page.imgFile)
 
     for (result, sample), filepath in zip(do_prediction, input_image_files):
         for i, p in enumerate(result):
@@ -97,7 +99,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--files", type=str, required=True, default="",
-                        help="Path to the Abbyy Documents and their images")
+                        help="List of the Image Files of the Abbyy Documents")
     parser.add_argument("--checkpoint", type=str, nargs="+", default=[],
                         help="Path to the checkpoint without file extension")
     parser.add_argument("-j", "--processes", type=int, default=1,
@@ -118,6 +120,8 @@ def main():
                         help="Extension format: Either pred or json. Note that json will not print logits.")
     parser.add_argument("--no_progress_bars", action="store_true",
                         help="Do not show any progress bars")
+    parser.add_argument("--binary", action="store_true",
+                        help="Works with binary images")
 
     args = parser.parse_args()
 

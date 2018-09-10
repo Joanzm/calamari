@@ -54,9 +54,11 @@ class XMLWriter:
                 except FileExistsError:
                     os.chdir(self.directory)
 
-                tree.write(open(oldxmlfile, 'wb'), encoding='utf-8', xml_declaration=True, pretty_print=True)
+                index = len(oldxmlfile.split('\\'))-1
+                tree.write(open(self.directory + '\\' + oldxmlfile.split('\\')[index], 'wb'), encoding='utf-8', xml_declaration=True, pretty_print=True)
+                tree.write(open(self.directory + '\\' + oldxmlfile.split('\\')[index], 'wb'), encoding='utf-8', xml_declaration=True, pretty_print=True)
                 try:
-                    copy(self.imgpath + "\\" + oldimgfile, self.directory)
+                    copy(oldimgfile, self.directory)
                 except PermissionError:
                     pass
 
@@ -120,9 +122,11 @@ class XMLWriter:
         except FileExistsError:
             os.chdir(self.directory)
 
-        tree.write(open(oldxmlfile, 'wb'), encoding='utf-8', xml_declaration=True, pretty_print=True)
+        index = len(oldxmlfile.split('\\')) - 1
+        tree.write(open(self.directory + '\\' + oldxmlfile.split('\\')[index], 'wb'), encoding='utf-8', xml_declaration=True,
+                   pretty_print=True)
         try:
-            copy(self.imgpath + "\\" + oldimgfile, self.directory)
+            copy(oldimgfile, self.directory)
         except PermissionError:
             pass
 

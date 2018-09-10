@@ -354,14 +354,14 @@ class FileDataSet(DataSet):
 
 class AbbyyDataSet(DataSet):
 
-    def __init__(self, path, skip_invalid=False, remove_invalid=True):
+    def __init__(self, files, skip_invalid=False, remove_invalid=True, binary=False):
 
         """ Create a dataset from a Path as String
 
         Parameters
          ----------
-        path : str, required
-            The Abbyy Documents and images folders absolute path
+        files : [], required
+            image files
         skip_invalid : bool, optional
             skip invalid files
         remove_invalid : bool, optional
@@ -370,14 +370,15 @@ class AbbyyDataSet(DataSet):
 
         super().__init__(True, True, skip_invalid, remove_invalid)
 
-        self.book = XMLReader(path).read()
+        self.book = XMLReader(files, skip_invalid, remove_invalid).read()
+        self.binary = binary
 
         count = 0
         for page in self.book.pages:
             for line in page.getLines():
                 for fo in line.formats:
                     self.add_sample({
-                        "image_path": path + "\\" + page.imgFile,
+                        "image_path": page.imgFile,
                         "id": count.__str__(),
                         "line": line,
                         "format": fo
@@ -401,26 +402,24 @@ class AbbyyDataSet(DataSet):
                 raise Exception("Image file at '{}' does not exist".format(image_path))
 
         try:
-            img = skimage_io.imread(image_path)
+            img = skimage_io.imread(image_path, as_gray=True)
         except:
             return None
 
         ly, lx = img.shape
 
         # Cut the Image
-        cut = img[line.rect.top: -ly + line.rect.bottom, line.rect.left: -lx + line.rect.right]
+        img = img[line.rect.top: -ly + line.rect.bottom, line.rect.left: -lx + line.rect.right]
 
-        # Make white Image with 3 Pixel at bottom and top more than cut
-        img = np.zeros([line.rect.height + 6, line.rect.width, 3], dtype=np.uint8)
-        img.fill(255)
-
-        # Insert cut into the white Image
-        h = len(cut)
-        w = len(cut[0])
-
-        for y in range(h):
-            for x in range(w):
-                img[y + 3, x] = cut[y, x]
+        """Binarize Image"""
+        if self.binary:
+            for i in range(len(img)):
+                for j in range(len(img[0])):
+                    #threshold
+                    if img[i][j] > 0.9:
+                        img[i][j] = 255
+                    else:
+                        img[i][j] = 0
 
         return img, text
 
